@@ -28,8 +28,15 @@ async def health():
 
 @app.post("/config")
 async def set_config(config: ConfigRequest):
-    global_config["check_interval_seconds"] = config.check_interval_seconds
-    global_config["request_timeout_ms"] = config.request_timeout_ms
+    # Stop and start for updated timeout or check interval for immediate update
+    if (
+        global_config["check_interval_seconds"] != config.check_interval_seconds
+        or global_config["request_timeout_ms"] != config.request_timeout_ms
+    ):
+        global_config["check_interval_seconds"] = config.check_interval_seconds
+        global_config["request_timeout_ms"] = config.request_timeout_ms
+        await stop_monitor()
+        start_monitor()
     return global_config
 
 @app.get("/config")
