@@ -20,7 +20,7 @@ jobs:
           script: |
             set -e
 
-            echo "📦 Navigating to project..."
+            echo "📦 Navigating to project.."
             cd ~/proxy-maze
 
             echo "⬇️ Pulling latest code..."
