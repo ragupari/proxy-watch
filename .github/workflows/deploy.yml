@@ -8,14 +8,28 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
-          password: ${{ secrets.PASSWORD }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
           script: |
+            set -e
+
+            echo "📦 Navigating to project..."
             cd ~/proxy-maze
-            git pull
+
+            echo "⬇️ Pulling latest code..."
+            git pull origin main
+
+            echo "🐳 Building and restarting Docker..."
             docker compose up -d --build
+
+            echo "🧹 Cleaning unused images..."
+            docker image prune -f
+
+            echo "✅ Deployment completed"
