@@ -19,7 +19,7 @@ async def probe_proxy(url: str, timeout_ms: int) -> str:
     
     try:
         async with httpx.AsyncClient(timeout=timeout_sec) as client:
-            response = await client.head(url, follow_redirects=True)
+            response = await client.get(url, follow_redirects=True)
             if 200 <= response.status_code < 300:
                 return "up"
             else:
@@ -57,23 +57,24 @@ async def check_and_deliver_alerts():
                 failure_rate, total_proxies, down_count, down_proxies, get_iso_now()
             )
             alert_data = alert_manager.alerts[alert_id]
-            asyncio.create_task(deliver_alert_webhooks("alert.fired", alert_data))
+            task = asyncio.create_task(deliver_alert_webhooks("alert.fired", alert_data))
+            background_tasks.add(task)
+            task.add_done_callback(background_tasks.discard)
         else:
-            # Update active alert
-            active_alert["failure_rate"] = round(failure_rate, 2)
-            active_alert["failed_proxies"] = down_count
-            active_alert["failed_proxy_ids"] = down_proxies.copy()
-            active_alert["total_proxies"] = total_proxies
+            pass # Do not update the alert; it must retain the state that justified the firing
     else:
         if active_alert:
             alert_id = alert_manager.resolve_alert(get_iso_now())
             if alert_id:
                 alert_data = alert_manager.alerts[alert_id]
-                asyncio.create_task(deliver_alert_webhooks("alert.resolved", alert_data))
+                task = asyncio.create_task(deliver_alert_webhooks("alert.resolved", alert_data))
+                background_tasks.add(task)
+                task.add_done_callback(background_tasks.discard)
 
 
 monitoring_active = False
 monitoring_task = None
+background_tasks = set()
 
 async def background_monitoring_loop():
     global monitoring_active
