@@ -9,8 +9,8 @@ def extract_proxy_id(url: str) -> str:
     return url.rstrip("/").split("/")[-1]
 
 def get_iso_now() -> str:
-    """Get current time in ISO 8601 UTC format"""
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    """Get current time in ISO 8601 UTC format without microseconds"""
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 def generate_alert_id() -> str:
     """Generate unique alert ID"""

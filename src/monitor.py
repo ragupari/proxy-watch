@@ -57,7 +57,7 @@ async def check_and_deliver_alerts():
                 failure_rate, total_proxies, down_count, down_proxies, get_iso_now()
             )
             alert_data = alert_manager.alerts[alert_id]
-            await deliver_alert_webhooks("alert.fired", alert_data)
+            asyncio.create_task(deliver_alert_webhooks("alert.fired", alert_data))
         else:
             # Update active alert
             active_alert["failure_rate"] = round(failure_rate, 2)
@@ -69,7 +69,7 @@ async def check_and_deliver_alerts():
             alert_id = alert_manager.resolve_alert(get_iso_now())
             if alert_id:
                 alert_data = alert_manager.alerts[alert_id]
-                await deliver_alert_webhooks("alert.resolved", alert_data)
+                asyncio.create_task(deliver_alert_webhooks("alert.resolved", alert_data))
 
 
 monitoring_active = False
