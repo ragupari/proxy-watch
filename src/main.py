@@ -17,6 +17,10 @@ async def startup_event():
 async def shutdown_event():
     await stop_monitor()
 
+@app.get("/")
+async def root():
+    return {"message": "Welcome to ProxyMaze"}
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
