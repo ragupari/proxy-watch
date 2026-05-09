@@ -1,29 +1,25 @@
 #!/bin/bash
 set -e
 
-echo "Starting ProxyMaze setup..."
+echo "Starting ProxyMaze via Docker..."
 
-# Check if Python 3 is installed
-if ! command -v python3 &> /dev/null
+# Check if Docker Compose is installed
+if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null
 then
-    echo "python3 could not be found. Please install Python 3."
+    echo "Docker Compose could not be found. Please install Docker and Docker Compose."
     exit 1
 fi
 
-# Create virtual environment if it doesn't exist
-if [ ! -d "venv" ]; then
-    echo "Creating virtual environment..."
-    python3 -m venv venv
+# Determine whether to use 'docker-compose' or 'docker compose'
+if command -v docker-compose &> /dev/null
+then
+    COMPOSE_CMD="docker-compose"
+else
+    COMPOSE_CMD="docker compose"
 fi
 
-# Activate virtual environment
-echo "Activating virtual environment..."
-source venv/bin/activate
+echo "Building and starting containers in detached mode..."
+$COMPOSE_CMD up --build -d
 
-# Install requirements
-echo "Installing dependencies..."
-pip install -r requirements.txt
-
-# Run the application
-echo "Starting ProxyMaze server..."
-uvicorn src.main:app --host 0.0.0.0 --port 8000
+echo "ProxyMaze is now running!"
+echo "View logs with: $COMPOSE_CMD logs -f"

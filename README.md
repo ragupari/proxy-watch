@@ -8,7 +8,8 @@ ProxyMaze is a production-grade HTTP API built with FastAPI that continuously mo
 -   **Real HTTP Probes:** Uses `httpx` to probe proxy URLs using actual HTTP requests (no mocked or cached responses).
 -   **Alert State Machine:** Enforces a strict single active alert constraint. Detects threshold breaches (>= 20%) and resolves them (< 20%) seamlessly, issuing new unique alert IDs for subsequent breaches.
 -   **Robust Webhooks:** Ensures exactly-once webhook delivery per state transition. Includes exponential backoff retry logic for transient errors (500, 502, 503, 504).
--   **Integrations:** Out-of-the-box formatted payload support for Slack and Discord alerts.
+-   **Integrations:** Out-of-the
+-box formatted payload support for Slack and Discord alerts.
 -   **State Consistency:** Ensures identical truth across endpoints (`/proxies`, `/alerts`) regarding the failure state and proxy metadata.
 -   **Validation:** Seamless handling of unknown JSON fields in incoming requests via robust Pydantic schemas.
 
