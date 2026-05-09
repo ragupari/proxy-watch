@@ -45,7 +45,7 @@ async def check_and_deliver_alerts():
         global_metrics["total_checks"] += 1
     
     failure_rate = proxy_pool.get_failure_rate()
-    down_proxies = proxy_pool.get_down_proxies()
+    down_proxies = sorted(proxy_pool.get_down_proxies())
     down_count = len(down_proxies)
     total_proxies = len(proxies)
     
@@ -61,7 +61,11 @@ async def check_and_deliver_alerts():
             background_tasks.add(task)
             task.add_done_callback(background_tasks.discard)
         else:
-            pass # Do not update the alert; it must retain the state that justified the firing
+            # Update active alert to keep GET /alerts consistent with GET /proxies
+            active_alert["failure_rate"] = failure_rate
+            active_alert["failed_proxies"] = down_count
+            active_alert["failed_proxy_ids"] = down_proxies
+            active_alert["total_proxies"] = total_proxies
     else:
         if active_alert:
             alert_id = alert_manager.resolve_alert(get_iso_now())

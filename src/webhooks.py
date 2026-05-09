@@ -71,8 +71,8 @@ def format_integration_payload(integration_type: str, event_type: str, alert_dat
     
     return {}
 
-async def send_webhook_delivery(url: str, payload: dict, retries: int = 3) -> bool:
-    """Send webhook with exponential backoff retry"""
+async def send_webhook_delivery(url: str, payload: dict, retries: int = 10) -> bool:
+    """Send webhook with exponential backoff retry (up to ~2 minutes of attempts)"""
     for attempt in range(retries):
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -87,21 +87,21 @@ async def send_webhook_delivery(url: str, payload: dict, retries: int = 3) -> bo
                     global_metrics["webhook_deliveries"] += 1
                     return True
                 
-                # Transient failure - retry
+                # Transient failure (500, 502, 503, 504) - retry per requirements
                 if response.status_code in [500, 502, 503, 504]:
                     if attempt < retries - 1:
-                        await asyncio.sleep(2 ** attempt)
+                        sleep_time = min(2 ** attempt, 15)
+                        await asyncio.sleep(sleep_time)
                         continue
-                    else:
-                        return False
                 
-                # Non-transient failure
+                # Non-transient failure (4xx, etc.) - stop
                 return False
         
         except Exception as e:
-            logger.warning(f"Webhook delivery failed: {e}")
+            logger.warning(f"Webhook delivery failed (attempt {attempt+1}): {e}")
             if attempt < retries - 1:
-                await asyncio.sleep(2 ** attempt)
+                sleep_time = min(2 ** attempt, 15)
+                await asyncio.sleep(sleep_time)
     
     return False
 
