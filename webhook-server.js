@@ -14,7 +14,14 @@ const appDir = __dirname;
 const requestLogs = [];
 let isDeploying = false;
 
-// Middleware for request logging
+// Use raw body for signature verification
+app.use(express.json({
+    verify: (req, res, buf) => {
+        req.rawBody = buf;
+    }
+}));
+
+// Middleware for request logging (After body parsing)
 app.use((req, res, next) => {
     // Skip logging for the /requests endpoint itself
     if (req.path === '/requests') {
@@ -25,19 +32,13 @@ app.use((req, res, next) => {
         timestamp: new Date().toISOString(),
         method: req.method,
         path: req.path,
-        ip: req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress
+        ip: req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+        payload: req.body && Object.keys(req.body).length > 0 ? req.body : null
     };
     requestLogs.push(logEntry);
     if (requestLogs.length > 100) requestLogs.shift();
     next();
 });
-
-// Use raw body for signature verification
-app.use(express.json({
-    verify: (req, res, buf) => {
-        req.rawBody = buf;
-    }
-}));
 
 // Verification middleware
 function verifySignature(req, res, next) {
