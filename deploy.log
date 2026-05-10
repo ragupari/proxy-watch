@@ -1,0 +1,12 @@
+[2026-05-10T05:40:12.196Z] --- STARTING DEPLOYMENT ---
+[2026-05-10T05:40:13.084Z] [PULL STDERR] From https://github.com/ragupari/proxy-watch
+ * branch            main       -> FETCH_HEAD
+[2026-05-10T05:40:13.107Z] [PULL STDOUT] Already up to date.
+[2026-05-10T05:40:13.109Z] git pull successful. Running run.sh...
+[2026-05-10T05:40:13.114Z] [RUN STDOUT] Starting ProxyMaze via Docker...
+[2026-05-10T05:40:13.854Z] [RUN STDOUT] Docker Compose could not be found. Please install Docker and Docker Compose.
+[2026-05-10T05:40:13.855Z] run.sh failed with code 1
+[2026-05-10T05:40:13.855Z] --- DEPLOYMENT FINISHED ---
+[STDOUT] Starting ProxyMaze via Docker...
+[STDOUT] Docker Compose could not be found. Please install Docker and Docker Compose.
+[2026-05-10T05:51:44.252Z] Deployment finished with code 1

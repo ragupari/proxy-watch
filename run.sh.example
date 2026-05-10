@@ -1,0 +1,21 @@
+#!/bin/bash
+# Production Deployment Script
+
+echo "Fetching latest changes..."
+git pull origin main
+
+echo "Installing dependencies..."
+# For Node server
+npm install
+# For Python server (if running directly)
+# pip install -r requirements.txt
+
+echo "Restarting services..."
+# If using PM2:
+# pm2 restart webhook-server
+# pm2 restart proxy-maze-backend
+
+# If using Docker Compose:
+docker-compose up -d --build
+
+echo "Deployment complete."

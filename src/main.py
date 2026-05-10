@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, Request
 from typing import List, Dict, Any
 import uuid
 
@@ -9,6 +9,30 @@ from .utils import extract_proxy_id
 
 app = FastAPI(title="ProxyMaze", version="1.0.0")
 
+# Request logging storage
+request_logs = []
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    from datetime import datetime, timezone
+    ip = request.client.host
+    timestamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    
+    # Store log entry
+    request_logs.append({
+        "timestamp": timestamp,
+        "method": request.method,
+        "path": request.url.path,
+        "ip": ip
+    })
+    
+    # Keep only last 100 logs
+    if len(request_logs) > 100:
+        request_logs.pop(0)
+        
+    response = await call_next(request)
+    return response
+
 @app.on_event("startup")
 async def startup_event():
     start_monitor()
@@ -16,7 +40,11 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     await stop_monitor()
-    
+
+@app.get("/requests")
+async def get_requests():
+    return request_logs
+
 @app.get("/")
 async def root():
     return {"message": "Welcome to ProxyMaze4.0"}

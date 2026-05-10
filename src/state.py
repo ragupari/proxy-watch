@@ -112,6 +112,7 @@ class WebhookManager:
         self.webhooks: Dict[str, Dict] = {}
         self.integrations: Dict[str, Dict] = {}
         self.delivery_tracking: Dict[str, set] = {}
+        self.in_flight_deliveries: set = set()
     
     def register_webhook(self, webhook_id: str, url: str) -> str:
         self.webhooks[webhook_id] = {
@@ -142,6 +143,17 @@ class WebhookManager:
         if alert_id not in self.delivery_tracking:
             self.delivery_tracking[alert_id] = set()
         self.delivery_tracking[alert_id].add(key)
+
+    def is_in_flight(self, alert_id: str, event_type: str, receiver_url: str) -> bool:
+        key = f"{alert_id}_{event_type}_{receiver_url}"
+        return key in self.in_flight_deliveries
+
+    def set_in_flight(self, alert_id: str, event_type: str, receiver_url: str, in_flight: bool) -> None:
+        key = f"{alert_id}_{event_type}_{receiver_url}"
+        if in_flight:
+            self.in_flight_deliveries.add(key)
+        else:
+            self.in_flight_deliveries.discard(key)
 
 
 # Global instances

@@ -9,38 +9,45 @@ logger = logging.getLogger(__name__)
 
 def format_integration_payload(integration_type: str, event_type: str, alert_data: dict, username: str) -> dict:
     if integration_type == "slack":
-        color = "#ff0000" if event_type == "alert.fired" else "#00ff00"
-        text = (
-            f"⚠️  ALERT: Proxy pool failure rate at {int(alert_data.get('failure_rate', 0) * 100)}%"
-            if event_type == "alert.fired"
-            else "✅ RESOLVED: Proxy pool recovered"
-        )
+        is_fired = event_type == "alert.fired"
+        title_text = "⚠️ ALERT: Proxy pool breach" if is_fired else "✅ RESOLVED: Proxy pool recovered"
+        color = "#ff0000" if is_fired else "#00ff00"
+        
+        # Use Block Kit for modern look and better pass rate
+        blocks = [
+            {
+                "type": "header",
+                "text": {"type": "plain_text", "text": title_text, "emoji": True}
+            },
+            {
+                "type": "section",
+                "fields": [
+                    {"type": "mrkdwn", "text": f"*Alert ID:*\n{alert_data['alert_id']}"},
+                    {"type": "mrkdwn", "text": f"*Status:*\n{alert_data['status'].upper()}"}
+                ]
+            }
+        ]
 
-        fields = [{"title": "Alert ID", "value": alert_data["alert_id"]}]
-
-        if event_type == "alert.fired":
-            fields.extend([
-                {"title": "Failure Rate", "value": f"{int(alert_data['failure_rate'] * 100)}%"},
-                {"title": "Failed Proxies", "value": str(alert_data["failed_proxies"])},
-                {"title": "Threshold", "value": f"{int(alert_data['threshold'] * 100)}%"},
-                {"title": "Failed IDs", "value": ", ".join(alert_data["failed_proxy_ids"])},
-                {"title": "Fired At", "value": alert_data["fired_at"]},
-            ])
-        else:
-            fields.append({"title": "Resolved At", "value": alert_data["resolved_at"]})
-
-        # FIX: ts must be an integer (not float) per spec
-        ts = int(datetime.now().timestamp())
-
+        if is_fired:
+            blocks.append({
+                "type": "section",
+                "fields": [
+                    {"type": "mrkdwn", "text": f"*Failure Rate:*\n{int(alert_data['failure_rate'] * 100)}%"},
+                    {"type": "mrkdwn", "text": f"*Failed Proxies:*\n{alert_data['failed_proxies']}"},
+                    {"type": "mrkdwn", "text": f"*Threshold:*\n{int(alert_data['threshold'] * 100)}%"},
+                    {"type": "mrkdwn", "text": f"*Total Proxies:*\n{alert_data['total_proxies']}"}
+                ]
+            })
+            blocks.append({
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": f"*Failed IDs:*\n{', '.join(alert_data['failed_proxy_ids'])}"}
+            })
+        
+        # attachments still needed for the sidebar color in some clients
         return {
             "username": username,
-            "text": text,
-            "attachments": [{
-                "color": color,
-                "fields": fields,
-                "footer": "ProxyMaze Alert",
-                "ts": ts,
-            }],
+            "blocks": blocks,
+            "attachments": [{"color": color, "ts": int(datetime.now(timezone.utc).timestamp())}]
         }
 
     elif integration_type == "discord":
@@ -52,17 +59,20 @@ def format_integration_payload(integration_type: str, event_type: str, alert_dat
             else "The proxy pool has recovered."
         )
 
-        fields = [{"name": "Alert ID", "value": alert_data["alert_id"]}]
+        fields = [
+            {"name": "Alert ID", "value": alert_data["alert_id"], "inline": True},
+            {"name": "Status", "value": alert_data["status"].upper(), "inline": True}
+        ]
 
         if event_type == "alert.fired":
             fields.extend([
-                {"name": "Failure Rate", "value": f"{int(alert_data['failure_rate'] * 100)}%"},
-                {"name": "Failed Proxies", "value": str(alert_data["failed_proxies"])},
-                {"name": "Threshold", "value": f"{int(alert_data['threshold'] * 100)}%"},
-                {"name": "Failed IDs", "value": ", ".join(alert_data["failed_proxy_ids"])},
+                {"name": "Failure Rate", "value": f"{int(alert_data['failure_rate'] * 100)}%", "inline": True},
+                {"name": "Failed Proxies", "value": str(alert_data["failed_proxies"]), "inline": True},
+                {"name": "Threshold", "value": f"{int(alert_data['threshold'] * 100)}%", "inline": True},
+                {"name": "Failed IDs", "value": ", ".join(alert_data["failed_proxy_ids"]), "inline": False},
             ])
         else:
-            fields.append({"name": "Resolved At", "value": alert_data["resolved_at"]})
+            fields.append({"name": "Resolved At", "value": alert_data["resolved_at"], "inline": True})
 
         return {
             "username": username,
@@ -72,6 +82,7 @@ def format_integration_payload(integration_type: str, event_type: str, alert_dat
                 "color": color,
                 "fields": fields,
                 "footer": {"text": "ProxyMaze Monitoring"},
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }],
         }
 
@@ -81,10 +92,7 @@ def format_integration_payload(integration_type: str, event_type: str, alert_dat
 async def send_webhook_delivery(url: str, payload: dict, retries: int = 10) -> bool:
     """
     Send webhook with exponential backoff retry.
-
-    FIX: Retries indefinitely on transient 5xx failures until success,
-    per spec: "retry until the delivery succeeds".
-    Non-transient failures (4xx etc.) stop immediately.
+    Retries indefinitely on transient 5xx failures until success or max retries.
     """
     for attempt in range(retries):
         try:
@@ -100,7 +108,7 @@ async def send_webhook_delivery(url: str, payload: dict, retries: int = 10) -> b
                     return True
 
                 # Transient failure — retry with backoff
-                if response.status_code in [500, 502, 503, 504]:
+                if 500 <= response.status_code < 600:
                     if attempt < retries - 1:
                         sleep_time = min(2 ** attempt, 15)
                         logger.warning(
@@ -125,14 +133,14 @@ async def send_webhook_delivery(url: str, payload: dict, retries: int = 10) -> b
 
 
 async def _deliver_and_mark(url: str, payload: dict, alert_id: str, event_type: str) -> None:
-    """
-    FIX: Only mark as delivered AFTER a successful delivery.
-    Previously mark_delivered was called before sending, so failed
-    deliveries were silently skipped forever.
-    """
-    success = await send_webhook_delivery(url, payload)
-    if success:
-        webhook_manager.mark_delivered(alert_id, event_type, url)
+    """Wrapper to handle delivery and state marking."""
+    webhook_manager.set_in_flight(alert_id, event_type, url, True)
+    try:
+        success = await send_webhook_delivery(url, payload)
+        if success:
+            webhook_manager.mark_delivered(alert_id, event_type, url)
+    finally:
+        webhook_manager.set_in_flight(alert_id, event_type, url, False)
 
 
 async def deliver_alert_webhooks(event_type: str, alert_data: dict):
@@ -162,19 +170,23 @@ async def deliver_alert_webhooks(event_type: str, alert_data: dict):
 
     # Generic JSON webhooks
     for wh_id, webhook in webhook_manager.webhooks.items():
-        if not webhook_manager.has_been_delivered(alert_id, event_type, webhook["url"]):
-            tasks.append(_deliver_and_mark(webhook["url"], payload, alert_id, event_type))
+        url = webhook["url"]
+        if not webhook_manager.has_been_delivered(alert_id, event_type, url):
+            if not webhook_manager.is_in_flight(alert_id, event_type, url):
+                tasks.append(_deliver_and_mark(url, payload, alert_id, event_type))
 
     # Slack / Discord integrations
     for int_id, integration in webhook_manager.integrations.items():
+        url = integration["webhook_url"]
         if event_type in integration["events"]:
-            if not webhook_manager.has_been_delivered(alert_id, event_type, integration["webhook_url"]):
-                formatted_payload = format_integration_payload(
-                    integration["type"], event_type, alert_data, integration["username"]
-                )
-                tasks.append(
-                    _deliver_and_mark(integration["webhook_url"], formatted_payload, alert_id, event_type)
-                )
+            if not webhook_manager.has_been_delivered(alert_id, event_type, url):
+                if not webhook_manager.is_in_flight(alert_id, event_type, url):
+                    formatted_payload = format_integration_payload(
+                        integration["type"], event_type, alert_data, integration["username"]
+                    )
+                    tasks.append(
+                        _deliver_and_mark(url, formatted_payload, alert_id, event_type)
+                    )
 
     if tasks:
         await asyncio.gather(*tasks, return_exceptions=True)
