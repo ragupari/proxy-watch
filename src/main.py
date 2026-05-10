@@ -15,6 +15,11 @@ request_logs = []
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     from datetime import datetime, timezone
+    
+    # Skip logging for the /requests endpoint itself
+    if request.url.path == "/requests":
+        return await call_next(request)
+        
     ip = request.client.host
     timestamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     

@@ -16,6 +16,11 @@ let isDeploying = false;
 
 // Middleware for request logging
 app.use((req, res, next) => {
+    // Skip logging for the /requests endpoint itself
+    if (req.path === '/requests') {
+        return next();
+    }
+
     const logEntry = {
         timestamp: new Date().toISOString(),
         method: req.method,
