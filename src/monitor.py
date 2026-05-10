@@ -70,13 +70,6 @@ async def check_and_deliver_alerts():
             task = asyncio.create_task(deliver_alert_webhooks("alert.fired", alert_data))
             background_tasks.add(task)
             task.add_done_callback(background_tasks.discard)
-        else:
-            # Update active alert fields to keep GET /alerts consistent
-            # with GET /proxies and webhook payloads (criterion 4.8)
-            active_alert["failure_rate"] = failure_rate
-            active_alert["failed_proxies"] = down_count
-            active_alert["failed_proxy_ids"] = down_proxies
-            active_alert["total_proxies"] = total_proxies
     else:
         if active_alert:
             alert_id = alert_manager.resolve_alert(get_iso_now())
