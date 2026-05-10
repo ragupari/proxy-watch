@@ -23,12 +23,27 @@ async def log_requests(request: Request, call_next):
     ip = request.client.host
     timestamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     
+    # Capture payload
+    payload = None
+    if request.method in ["POST", "PUT", "PATCH"]:
+        try:
+            body = await request.body()
+            import json
+            payload = json.loads(body)
+            # Re-attach body so subsequent handlers can read it
+            async def receive():
+                return {"type": "http.request", "body": body, "more_body": False}
+            request._receive = receive
+        except Exception:
+            payload = "Non-JSON or empty body"
+
     # Store log entry
     request_logs.append({
         "timestamp": timestamp,
         "method": request.method,
         "path": request.url.path,
-        "ip": ip
+        "ip": ip,
+        "payload": payload
     })
     
     # Keep only last 100 logs
